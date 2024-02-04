@@ -50,7 +50,7 @@ func main() {
 	for {
 		select {
 		case msg := <-resChan:
-			fmt.Printf("Chegou primeiro o: %s", msg.api)
+			fmt.Printf("Chegou primeiro o: %s\n", msg.api)
 		case err := <-errChan:
 			log.Fatalf("%+v", err)
 		}
