@@ -2,9 +2,16 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"time"
 )
+
+type response struct {
+	res *http.Response
+	api string
+}
 
 func handlerErr(err error, chanErr chan error) {
 	if err != nil {
@@ -12,15 +19,29 @@ func handlerErr(err error, chanErr chan error) {
 	}
 }
 
-func httpGet(client *http.Client, api string, errChan chan error, resChan chan string, service string) {
-	_, err := client.Get(api)
+func handler(msg response, chanErr chan error) {
+	fmt.Printf("Quem chegou primeiro foi o: %s\n", msg.api)
+
+	reader, err := io.ReadAll(msg.res.Body)
+	handlerErr(err, chanErr)
+	defer msg.res.Body.Close()
+
+	fmt.Printf("Com o seguinte body de response: %s\n", string(reader))
+}
+
+func httpGet(client *http.Client, api string, errChan chan error, resChan chan response, service string) {
+	res, err := client.Get(api)
 	handlerErr(err, errChan)
-	resChan <- service
+	response := response{
+		res: res,
+		api: service,
+	}
+	resChan <- response
 }
 
 func main() {
 	errChan := make(chan error)
-	resChan := make(chan string)
+	resChan := make(chan response)
 	client := http.DefaultClient
 	cep := "01311200"
 
@@ -38,12 +59,12 @@ func main() {
 		}
 	}()
 
-	for {
-		select {
-		case msg := <-resChan:
-			fmt.Printf("Chegou primeiro o: %s\n", msg)
-		case err := <-errChan:
-			log.Fatalf("%+v", err)
-		}
+	select {
+	case msg := <-resChan:
+		handler(msg, errChan)
+	case err := <-errChan:
+		log.Fatalf("%+v", err)
+	case <-time.After(time.Second):
+		log.Fatalln("time out!!!")
 	}
 }
