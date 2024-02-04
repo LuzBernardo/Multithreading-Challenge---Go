@@ -47,10 +47,12 @@ func main() {
 		}
 	}()
 
-	select {
-	case msg := <-resChan:
-		fmt.Printf("Chegou primeiro o: %s", msg.api)
-	case err := <-errChan:
-		log.Fatalf("%+v", err)
+	for {
+		select {
+		case msg := <-resChan:
+			fmt.Printf("Chegou primeiro o: %s", msg.api)
+		case err := <-errChan:
+			log.Fatalf("%+v", err)
+		}
 	}
 }
