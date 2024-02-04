@@ -6,30 +6,21 @@ import (
 	"net/http"
 )
 
-type response struct {
-	res *http.Response
-	api string
-}
-
 func handlerErr(err error, chanErr chan error) {
 	if err != nil {
 		chanErr <- err
 	}
 }
 
-func httpGet(client *http.Client, api string, errChan chan error, resChan chan response, service string) {
-	res, err := client.Get(api)
+func httpGet(client *http.Client, api string, errChan chan error, resChan chan string, service string) {
+	_, err := client.Get(api)
 	handlerErr(err, errChan)
-	response := response{
-		res: res,
-		api: service,
-	}
-	resChan <- response
+	resChan <- service
 }
 
 func main() {
 	errChan := make(chan error)
-	resChan := make(chan response)
+	resChan := make(chan string)
 	client := http.DefaultClient
 	cep := "01311200"
 
@@ -50,7 +41,7 @@ func main() {
 	for {
 		select {
 		case msg := <-resChan:
-			fmt.Printf("Chegou primeiro o: %s\n", msg.api)
+			fmt.Printf("Chegou primeiro o: %s\n", msg)
 		case err := <-errChan:
 			log.Fatalf("%+v", err)
 		}
