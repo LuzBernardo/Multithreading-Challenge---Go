@@ -13,13 +13,21 @@ type response struct {
 	api string
 }
 
-func handlerErr(err error, chanErr chan error) {
+type request struct {
+	client  *http.Client
+	api     string
+	errChan *chan error
+	resChan *chan response
+	service string
+}
+
+func handlerErr(err error, chanErr *chan error) {
 	if err != nil {
-		chanErr <- err
+		*chanErr <- err
 	}
 }
 
-func handler(msg response, chanErr chan error) {
+func handler(msg response, chanErr *chan error) {
 	fmt.Printf("Quem chegou primeiro foi o: %s\n", msg.api)
 
 	reader, err := io.ReadAll(msg.res.Body)
@@ -29,19 +37,19 @@ func handler(msg response, chanErr chan error) {
 	fmt.Printf("Com o seguinte body de response: %s\n", string(reader))
 }
 
-func httpGet(client *http.Client, api string, errChan chan error, resChan chan response, service string) {
-	res, err := client.Get(api)
-	handlerErr(err, errChan)
+func httpGet(req *request) {
+	res, err := req.client.Get(req.api)
+	handlerErr(err, req.errChan)
 	response := response{
 		res: res,
-		api: service,
+		api: req.service,
 	}
-	resChan <- response
+	*req.resChan <- response
 }
 
 func main() {
 	errChan := make(chan error)
-	resChan := make(chan response)
+	resChan := make(chan response, 2)
 	client := http.DefaultClient
 	cep := "01311200"
 
@@ -49,19 +57,29 @@ func main() {
 	viaApi := fmt.Sprintf("http://viacep.com.br/ws/%s/json", cep)
 
 	go func() {
-		for {
-			httpGet(client, viaApi, errChan, resChan, "viaApi")
+		request := request{
+			client:  client,
+			api:     viaApi,
+			errChan: &errChan,
+			resChan: &resChan,
+			service: "viaApi",
 		}
+		httpGet(&request)
 	}()
 	go func() {
-		for {
-			httpGet(client, brasilApi, errChan, resChan, "brasilApi")
+		request := request{
+			client:  client,
+			api:     brasilApi,
+			errChan: &errChan,
+			resChan: &resChan,
+			service: "brasilApi",
 		}
+		httpGet(&request)
 	}()
 
 	select {
 	case msg := <-resChan:
-		handler(msg, errChan)
+		handler(msg, &errChan)
 	case err := <-errChan:
 		log.Fatalf("%+v", err)
 	case <-time.After(time.Second):
